@@ -1,0 +1,183 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+```
+
+Download the file
+```{r}
+download.file("https://researchbriefings.files.parliament.uk/documents/CBP-8647/1918-2019election_results_by_pcon.xlsx", destfile = "1918-2019election_results_by_pcon.xlsx")
+```
+First attempt to read
+
+```{r}
+raw <- read_xlsx("1918-2019election_results_by_pcon.xlsx")
+View(raw)
+```
+
+There's clearly some header information we need to deal with
+
+```{r}
+raw <- read_xlsx("1918-2019election_results_by_pcon.xlsx", skip = 3)
+raw
+```
+
+And we need to select the particular sheet that we're interested in 
+
+```{r}
+excel_sheets("1918-2019election_results_by_pcon.xlsx")
+raw <- read_xlsx("1918-2019election_results_by_pcon.xlsx", skip = 3,sheet = 29)
+View(raw)
+```
+
+Lets use dplyr to pick columns of interest. Some manual renaming involved :/
+
+```{r}
+cleaned <- raw %>% 
+  select(Constituency:Electorate, Turnout, `Total votes`, contains("Votes...")) %>% 
+  rename("Conservative" = `Votes...8`,
+         "Labour" = `Votes...11`,
+         "Lib. Dem." = `Votes...14`,
+         "Brexit" = `Votes...17`,
+         "Green" = `Votes...20`,
+         "SNP" = `Votes...23`,
+         "Plaid Cymru" = `Votes...26`,
+         "DUP" = `Votes...29`,
+         "Sinn Fein" = `Votes...32`,
+         "SDLP" = `Votes...35`,
+         "UUP" = `Votes...38`,
+         "Alliance" = `Votes...41`,
+         "Other" = `Votes...44`)
+cleaned
+```
+Sanity check on the data
+
+```{r}
+cleaned %>% 
+  mutate(Total_votes_calc = Electorate * Turnout) %>% 
+  select(`Total votes`, Total_votes_calc)
+```
+
+So lets see if the number of votes is related to the size of the electorate (it should be!)
+
+
+```{r}
+ggplot(cleaned, aes(x = Electorate, y = `Total votes`)) +
+  geom_point()
+```
+
+
+```{r}
+ggplot(cleaned, aes(x = Electorate, y = `Total votes`)) +
+  geom_point() + geom_smooth(method = "lm")
+```
+
+The add-on package `ggpubr` allows us to 
+```{r}
+library(ggpubr)
+ggplot(cleaned, aes(x = Electorate, y = `Total votes`)) +
+  geom_point() + geom_smooth(method = "lm") + stat_cor()
+```
+
+- Show the turnout variable against Country. Is there a difference?
+- Plot Conservative votes against Labour. Is it how you expect? Try colouring by the Country
+
+
+
+
+A useful plotting technique is to split a figure depending on a variable. Here, we can plot the size of electorate against total votes for each country
+
+```{r}
+ggplot(cleaned, aes(x = Electorate, y = `Total votes`)) +
+  geom_point() + geom_smooth(method = "lm") + stat_cor() + facet_wrap(~Country)
+```
+
+But how many votes did the parties get? We can start by adding up the respective columns
+
+```{r}
+cleaned %>% 
+  summarize_at(vars(Conservative:Alliance),sum, na.rm = TRUE)
+```
+But what happens if we try and visualise? Try and write the ggplot code..
+
+```{r}
+cleaned %>% 
+  summarize_at(vars(Conservative:Alliance),sum, na.rm = TRUE) %>% 
+  ggplot(aes(x = , y = )) + geom_col()
+```
+
+We can't do this at the moment, because the data are wide rather than long
+
+```{r}
+library(forcats)
+cleaned %>% 
+  summarize_at(vars(Conservative:Other),sum, na.rm = TRUE) %>% 
+  pivot_longer(everything(),values_to = "Votes", names_to = "Party") %>% 
+  mutate(Party = fct_reorder(Party, Votes))
+```
+```{r}
+
+cleaned %>% 
+  summarize_at(vars(Conservative:Other),sum, na.rm = TRUE) %>% 
+  pivot_longer(everything(),values_to = "Votes", names_to = "Party") %>% 
+  mutate(Party = fct_reorder(Party, Votes)) %>% 
+  ggplot(aes(x = Party, y = Votes, fill=Party)) + geom_col()
+```
+Can you plot just Green to Conservatives?
+Choose appropriate colours for each bar?
+
+
+
+```{r}
+cleaned %>% 
+  pivot_longer(Conservative:Other, names_to = "Party", values_to ="Votes") %>% 
+  filter(!is.na(Votes))
+  
+```
+
+Calculate the percentage of votes for each party
+
+```{r}
+cleaned %>% 
+  pivot_longer(Conservative:Other, names_to = "Party", values_to ="Votes") %>% 
+  filter(!is.na(Votes)) %>% 
+  mutate(`Percentage of Vote` = (Votes / `Total votes`)*100)
+```
+
+```{r}
+cleaned %>% 
+  pivot_longer(Conservative:Other, names_to = "Party", values_to ="Votes") %>% 
+  filter(!is.na(Votes)) %>% 
+  mutate(`Percentage of Vote` = (Votes / `Total votes`)*100) %>% 
+  group_by(Constituency) %>% 
+  arrange(desc(`Percentage of Vote`),.by_group = TRUE)
+```
+
+```{r}
+cleaned %>% 
+  pivot_longer(Conservative:Other, names_to = "Party", values_to ="Votes") %>% 
+  filter(!is.na(Votes)) %>% 
+  mutate(`Percentage of Vote` = (Votes / `Total votes`)*100) %>% 
+  group_by(Constituency) %>% 
+  arrange(desc(`Percentage of Vote`),.by_group = TRUE) %>% 
+  slice(1:2) %>% 
+  mutate(`Second Place` = lead(`Percentage of Vote`,order_by = Constituency), Majority = `Percentage of Vote` - `Second Place`)
+```
+
+```{r}
+results <- cleaned %>% 
+  pivot_longer(Conservative:Other, names_to = "Party", values_to ="Votes") %>% 
+  filter(!is.na(Votes)) %>% 
+  mutate(`Percentage of Vote` = (Votes / `Total votes`)*100) %>% 
+  group_by(Constituency) %>% 
+  arrange(desc(`Percentage of Vote`),.by_group = TRUE) %>% 
+  slice(1:2) %>% 
+  mutate(`Second Place` = lead(`Percentage of Vote`,order_by = Constituency), Majority = `Percentage of Vote` - `Second Place`) %>% 
+  slice(1)
+```
+
