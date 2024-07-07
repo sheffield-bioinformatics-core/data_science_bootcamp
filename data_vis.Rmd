@@ -148,6 +148,22 @@ cleaned %>%
   filter(!is.na(Votes)) %>% 
   mutate(`Percentage of Vote` = (Votes / `Total votes`)*100)
 ```
+We can now drill-down into the results for particular constituencies. Lets' look at all the Sheffield results for the four biggest parties. 
+
+```{r}
+shef_votes <- cleaned %>% 
+  pivot_longer(Conservative:Other, names_to = "Party", values_to ="Votes") %>% 
+  filter(!is.na(Votes)) %>% 
+  mutate(`Percentage of Vote` = (Votes / `Total votes`)*100) %>% 
+  filter(grepl("SHEFFIELD", Constituency), 
+         Party %in% c("Conservative", "Green", "Labour", "Lib. Dem.")) 
+```
+
+```{r}
+shef_votes %>% 
+  ggplot(aes(y = Constituency, x = `Percentage of Vote`, fill=Party)) + geom_col() + scale_fill_manual(values = c("#0087DC", "#008066","#DC241f","#FDBB30"))
+```
+
 
 ```{r}
 cleaned %>% 
