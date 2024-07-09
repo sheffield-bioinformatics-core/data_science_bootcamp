@@ -9,20 +9,17 @@ library(tidyverse)
 library(readxl)
 ```
 
-Download the file
-```{r}
-download.file("https://researchbriefings.files.parliament.uk/documents/CBP-8647/1918-2019election_results_by_pcon.xlsx", destfile = "1918-2019election_results_by_pcon.xlsx")
-```
-First attempt to read
 
-```{r}
+First attempt to read using the `read_xlsx` package - which is developed specifically for `xls` and `xlsx` files. Even though the function runs without error, it's highly recommended to `View` the contents of the data frame.
+
+```{r message=FALSE}
 raw <- read_xlsx("1918-2019election_results_by_pcon.xlsx")
 View(raw)
 ```
 
-There's clearly some header information we need to deal with
+There's clearly some header information we need to deal with. The `skip` argument allows some rows in the input file to be ignored. 
 
-```{r}
+```{r message=FALSE}
 raw <- read_xlsx("1918-2019election_results_by_pcon.xlsx", skip = 3)
 raw
 ```
@@ -55,15 +52,49 @@ cleaned <- raw %>%
          "Other" = `Votes...44`)
 cleaned
 ```
-Sanity check on the data
+However, a bit of inspection shows some extra rows in the file that shouldn't have been included.
+
+```{r}
+tail(cleaned)
+```
+
+Such problematic rows can be identified by having an `NA` in the `Country` column
+
+```{r}
+cleaned <- filter(cleaned, !is.na(Country))
+```
+
+
+We can save as csv file for future use.
+
+```{r}
+write_csv(cleaned, "uk_election_2019.csv")
+```
+
+If at any point we need to read the original data we can do:-
+
+```{r}
+cleaned <- read_csv("uk_election_2019.csv")
+```
+
+As part of understanding the data it is helpful to carry out a few checks on the data quality. Although we have the total number of votes as a column, we can check that this has been computed correctly. 
 
 ```{r}
 cleaned %>% 
-  mutate(Total_votes_calc = Electorate * Turnout) %>% 
+  mutate(Total_votes_calc = Electorate * Turnout) %>%
   select(`Total votes`, Total_votes_calc)
 ```
 
-So lets see if the number of votes is related to the size of the electorate (it should be!)
+Exercise:
+
+Investigate the `arrange` function to find the smallest and largest Electorates. Can you find the smallest / largest within each country?
+
+```{r}
+ggplot(cleaned, aes(x = Electorate)) + geom_histogram()
+```
+
+
+Lets see if the number of votes is related to the size of the electorate (it should be!). 
 
 
 ```{r}
@@ -105,33 +136,28 @@ cleaned %>%
 ```
 But what happens if we try and visualise? Try and write the ggplot code..
 
-```{r}
+```{r eval=FALSE}
 cleaned %>% 
   summarize_at(vars(Conservative:Alliance),sum, na.rm = TRUE) %>% 
   ggplot(aes(x = , y = )) + geom_col()
 ```
 
-We can't do this at the moment, because the data are wide rather than long
+We can't do this at the moment, because the data are wide rather than long.
 
 ```{r}
 library(forcats)
+total_votes <- 
 cleaned %>% 
   summarize_at(vars(Conservative:Other),sum, na.rm = TRUE) %>% 
   pivot_longer(everything(),values_to = "Votes", names_to = "Party") %>% 
   mutate(Party = fct_reorder(Party, Votes))
 ```
-```{r}
 
-cleaned %>% 
-  summarize_at(vars(Conservative:Other),sum, na.rm = TRUE) %>% 
-  pivot_longer(everything(),values_to = "Votes", names_to = "Party") %>% 
-  mutate(Party = fct_reorder(Party, Votes)) %>% 
+```{r}
+total_votes %>% 
   ggplot(aes(x = Party, y = Votes, fill=Party)) + geom_col()
 ```
-Can you plot just Green to Conservatives?
-Choose appropriate colours for each bar?
-
-
+However, these summed values don't acutally tell us who one the election. Instead, we need to know who won in each constituency.
 
 ```{r}
 cleaned %>% 
@@ -140,7 +166,7 @@ cleaned %>%
   
 ```
 
-Calculate the percentage of votes for each party
+Calculate the percentage of votes for each party in each constituency.
 
 ```{r}
 cleaned %>% 
@@ -159,11 +185,16 @@ shef_votes <- cleaned %>%
          Party %in% c("Conservative", "Green", "Labour", "Lib. Dem.")) 
 ```
 
-```{r}
-shef_votes %>% 
-  ggplot(aes(y = Constituency, x = `Percentage of Vote`, fill=Party)) + geom_col() + scale_fill_manual(values = c("#0087DC", "#008066","#DC241f","#FDBB30"))
+Produce the following graph to show the vote split for the different parts of Sheffield. These colours were used in the example plot:-
+
+```{r eval=FALSE}
+c("#0087DC", "#008066","#DC241f","#FDBB30")
 ```
 
+
+![](shef-votes.png)
+
+Now to determine the winners for each constituency. To do this, we will order the percentage of votes within each constituency
 
 ```{r}
 cleaned %>% 
@@ -173,6 +204,7 @@ cleaned %>%
   group_by(Constituency) %>% 
   arrange(desc(`Percentage of Vote`),.by_group = TRUE)
 ```
+To calculate the majority (i.e. how much each seat was won by), we'll need the first and second place votes.
 
 ```{r}
 cleaned %>% 
@@ -185,6 +217,8 @@ cleaned %>%
   mutate(`Second Place` = lead(`Percentage of Vote`,order_by = Constituency), Majority = `Percentage of Vote` - `Second Place`)
 ```
 
+Finally, we can select the winner of each seat and their majority.
+
 ```{r}
 results <- cleaned %>% 
   pivot_longer(Conservative:Other, names_to = "Party", values_to ="Votes") %>% 
@@ -195,5 +229,14 @@ results <- cleaned %>%
   slice(1:2) %>% 
   mutate(`Second Place` = lead(`Percentage of Vote`,order_by = Constituency), Majority = `Percentage of Vote` - `Second Place`) %>% 
   slice(1)
+```
+
+
+We can now work out the number of seats
+
+```{r}
+results %>% 
+  group_by(Party) %>% 
+  summarize(Seats = n())
 ```
 
