@@ -3,10 +3,32 @@ title: "R Notebook"
 output: html_notebook
 ---
 
+# Outline
+
+In this tutorial we will introduction / review some concepts of using `dplyr`, `ggplot2` and other parts of the "tidyverse". Briefly:-
+
+- Data Import
+  - From Xlsx and csv formats
+- Data Cleaning
+  - Renaming columns, filtering, transforming columns
+- Data Manipulation
+  - "Wide" vs "Long" data
+  - (Re-)arranging rows
+  - Grouping and summarising tables
+- Data Visualisation
+  - Basic plot types
+  - Splitting-up plots based on variables - faceting
+  - Using colours
+
+
+For more information on these key packages you can consult the "cheatsheets" available through the help menus, or from the [tidyverse](https://www.tidyverse.org/) website itself.
+
+# Get Started
+
+Lets' load the packages we will need. `tidyverse` will load all the packages we need
 
 ```{r}
 library(tidyverse)
-library(readxl)
 ```
 
 
@@ -85,14 +107,45 @@ cleaned %>%
   select(`Total votes`, Total_votes_calc)
 ```
 
-Exercise:
+We now have some data that we can start to visualise. For this we are going to use the `ggplot2` package. This is a *flexible* and *extendable* plotting framework with a consistent interface. It can make publication-ready figures with less effort than "base" R. With some practice, you will spend less time writing code to make figures and **more time interpreting and interrogating your data** - which is what we really want to spend our time doing!
 
-Investigate the `arrange` function to find the smallest and largest Electorates. Can you find the smallest / largest within each country?
+A useful resource to guide us in making our figures is data-to-viz. Sometimes it can even help to sketch a figure first using pencil and paper.
+
+- [Choose the most appropriate figure for your data - data-to-viz](https://www.data-to-viz.com/)
+
+We start by looking at the size of electorate size (the number of people eligible to vote in each region). Since this is a single continuous variable, a number of different plots are available to use. We will use a histogram.
+
+The different components required for a ggplot are:-
+
+- the data frame that you want to plot
+- definitions of how to plot variables / columns in that data to the plot aesthetics (x-axis, y-axis, colour, shape etc)
+- what type of plot (geom_) you want
+
+
 
 ```{r}
 ggplot(cleaned, aes(x = Electorate)) + geom_histogram()
 ```
 
+Changing the type of plot, for the same variable, can be achieved by changing the `geom_`
+
+```{r}
+ggplot(cleaned, aes(x = Electorate)) + geom_density()
+```
+```{r}
+ggplot(cleaned, aes(x = Electorate)) +geom_histogram(aes(y = ..density..)) + geom_density(col="blue")
+```
+
+---
+
+**Exercise**
+
+- Visualise the distribution of electorate sizes in different countries?
+  - as a boxplot with jittered (geom_jitter) points overlaid
+  
+![](electorate-size-comparison.png)  
+
+---
 
 Lets see if the number of votes is related to the size of the electorate (it should be!). 
 
@@ -108,17 +161,20 @@ ggplot(cleaned, aes(x = Electorate, y = `Total votes`)) +
   geom_point() + geom_smooth(method = "lm")
 ```
 
-The add-on package `ggpubr` allows us to 
+The add-on package `ggpubr` allows us to add the correlation value onto the graph. Other functions from this package allow us to add p-values etc when comparing distributions via boxplots.
+
 ```{r}
 library(ggpubr)
 ggplot(cleaned, aes(x = Electorate, y = `Total votes`)) +
   geom_point() + geom_smooth(method = "lm") + stat_cor()
 ```
 
-- Show the turnout variable against Country. Is there a difference?
-- Plot Conservative votes against Labour. Is it how you expect? Try colouring by the Country
+Is this same trend observed for all Countries? One way to look at this would be use different colours. This can be done by defining the `col` aesthetic. It will assign colours in a sensible fashion, and we can also define our own palette.
 
-
+```{r}
+ggplot(cleaned, aes(x = Electorate, y = `Total votes`, col = Country)) +
+  geom_point()
+```
 
 
 A useful plotting technique is to split a figure depending on a variable. Here, we can plot the size of electorate against total votes for each country
@@ -128,21 +184,50 @@ ggplot(cleaned, aes(x = Electorate, y = `Total votes`)) +
   geom_point() + geom_smooth(method = "lm") + stat_cor() + facet_wrap(~Country)
 ```
 
-But how many votes did the parties get? We can start by adding up the respective columns
+
+But how many votes did the parties get? We can start by adding up the respective columns. The `summarize`/`summarise` collection of functions allow many ways to summarise our data. The general approach is to use specify what summary function you want to use on which columns, and say what you want the result to be called:-
 
 ```{r}
-cleaned %>% 
-  summarize_at(vars(Conservative:Alliance),sum, na.rm = TRUE)
+## na.rm needed as there are some 'NA' values which would result in 'NA' for the sum
+
+summarise(cleaned, 
+          Conservative_Votes = sum(Conservative,na.rm = TRUE))
 ```
-But what happens if we try and visualise? Try and write the ggplot code..
+Typically the summary functions are used for descriptive statistics; )`mean`, `median`, `sd`, `var` etc) and give a **single value**. However, we don't want to spend our time typing out code to summarise all the colums we are interested in
+
+```{r}
+## Don't do this - unless you have very few columns
+
+summarise(cleaned, 
+          Conservative_Votes = sum(Conservative,na.rm = TRUE),
+          Labour_Votes = sum(Labour, na.rm = TRUE),
+          Lib_Dem_Votes = sum(`Lib. Dem.`,na.rm=TRUE)
+          )
+```
+`dplyr` is replete with shortcuts that are designed to make your life easier. 
+
+```{r}
+summarize_at(cleaned, vars(Conservative:Alliance),sum, na.rm = TRUE)
+```
+But what happens if we try and visualise? Try and write the `ggplot` code.
 
 ```{r eval=FALSE}
+## don't try and run this - it won't work!
 cleaned %>% 
   summarize_at(vars(Conservative:Alliance),sum, na.rm = TRUE) %>% 
   ggplot(aes(x = , y = )) + geom_col()
 ```
 
-We can't do this at the moment, because the data are wide rather than long.
+We can't do this at the moment, because the data are "wide" rather than "long".
+
+```{r}
+vote_sums <- summarize_at(cleaned, vars(Conservative:Alliance),sum, na.rm = TRUE)
+pivot_longer(vote_sums, everything(), values_to = "Votes", names_to = "Party")
+```
+
+## Let's talk about "piping"
+
+
 
 ```{r}
 library(forcats)
