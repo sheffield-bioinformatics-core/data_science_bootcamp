@@ -12,7 +12,7 @@ In this tutorial we will review some fundamental concepts of Data Manipulation a
 
 In preparation for the course, please install the `tidyverse` suite of R packages
 ```
-install.packages(c("tidyverse", "ggpubr"))
+install.packages(c("tidyverse", "ggpubr", "readxl"))
 ```
 
 ## Data
