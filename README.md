@@ -28,5 +28,5 @@ Please download these data in advance of the course
 
 Will appear here!
 
-- R markdown
-- Compiled HTML
+- [R markdown](data_vis.Rmd)
+- [Compiled HTML](data_vis.nb.html)
