@@ -1,5 +1,5 @@
 ---
-title: "R Notebook"
+title: "Review of Data Manipulation and Visualization using tidyverse"
 output: html_notebook
 ---
 
@@ -29,6 +29,7 @@ Lets' load the packages we will need. `tidyverse` will load all the packages we 
 
 ```{r}
 library(tidyverse)
+library(readxl)
 ```
 
 
@@ -51,7 +52,6 @@ And we need to select the particular sheet that we're interested in
 ```{r}
 excel_sheets("1918-2019election_results_by_pcon.xlsx")
 raw <- read_xlsx("1918-2019election_results_by_pcon.xlsx", skip = 3,sheet = 29)
-View(raw)
 ```
 
 Lets use dplyr to pick columns of interest. Some manual renaming involved :/
@@ -136,6 +136,13 @@ ggplot(cleaned, aes(x = Electorate)) + geom_density()
 ggplot(cleaned, aes(x = Electorate)) +geom_histogram(aes(y = ..density..)) + geom_density(col="blue")
 ```
 
+N.B the `gghistogram` function from `ggpubr` combined with `stat_overlay_normal_density` gives us a way to overlay the *standard* normal distribution
+
+```{r}
+gghistogram(cleaned, "Electorate",y = "..density..") + stat_overlay_normal_density(col="red",lty=2)
+```
+
+
 ---
 
 **Exercise**
@@ -154,7 +161,7 @@ Lets see if the number of votes is related to the size of the electorate (it sho
 ggplot(cleaned, aes(x = Electorate, y = `Total votes`)) +
   geom_point()
 ```
-
+Since we can add different types of plot, it will be useful to add a straight line.
 
 ```{r}
 ggplot(cleaned, aes(x = Electorate, y = `Total votes`)) +
@@ -171,9 +178,20 @@ ggplot(cleaned, aes(x = Electorate, y = `Total votes`)) +
 
 Is this same trend observed for all Countries? One way to look at this would be use different colours. This can be done by defining the `col` aesthetic. It will assign colours in a sensible fashion, and we can also define our own palette.
 
+
+
 ```{r}
 ggplot(cleaned, aes(x = Electorate, y = `Total votes`, col = Country)) +
   geom_point()
+```
+Colours can be defined using the `scale_color_manual` function. Here we make use of the `RColorBrewer` package for a pre-defined set. However, in the following code the contents of `my_colours` could be any combination of colour names or rgb.
+
+```{r}
+library(RColorBrewer)
+my_colours <- brewer.pal(4, "Set1")
+my_colours
+ggplot(cleaned, aes(x = Electorate, y = `Total votes`, col = Country)) +
+  geom_point() + scale_color_manual(values=my_colours)
 ```
 
 
@@ -184,8 +202,16 @@ ggplot(cleaned, aes(x = Electorate, y = `Total votes`)) +
   geom_point() + geom_smooth(method = "lm") + stat_cor() + facet_wrap(~Country)
 ```
 
+We can compare numbers of votes between different regions. Let's look at Sheffield
 
-But how many votes did the parties get? We can start by adding up the respective columns. The `summarize`/`summarise` collection of functions allow many ways to summarise our data. The general approach is to use specify what summary function you want to use on which columns, and say what you want the result to be called:-
+```{r}
+shef_data <- filter(cleaned, grepl("SHEFF",Constituency))
+```
+```{r}
+ggplot(shef_data, aes(x = Constituency, y = Conservative)) + geom_col(fill="#0087DC")
+```
+
+But how many votes did the parties get overall, and who won? We can start by adding up the respective columns. The `summarize`/`summarise` collection of functions allow many ways to summarise our data. The general approach is to use specify what summary function you want to use on which columns, and say what you want the result to be called:-
 
 ```{r}
 ## na.rm needed as there are some 'NA' values which would result in 'NA' for the sum
@@ -218,7 +244,8 @@ cleaned %>%
   ggplot(aes(x = , y = )) + geom_col()
 ```
 
-We can't do this at the moment, because the data are "wide" rather than "long".
+We can't do this at the moment, because the data are "wide" rather than "long". To make the data long, we can specify a set of paired key:value columns. In our case, we want a column that gives a number of votes, and a column to tell us which party those votes were for.
+
 
 ```{r}
 vote_sums <- summarize_at(cleaned, vars(Conservative:Alliance),sum, na.rm = TRUE)
@@ -227,16 +254,17 @@ pivot_longer(vote_sums, everything(), values_to = "Votes", names_to = "Party")
 
 ## Let's talk about "piping"
 
-
+A relatively recent addition to the R language is the concept of piping, which can help us to make code easier to write (and read). The premise is that one line of code is used as the input for the following line. This is especially effective in dplyr, where must functions take a data frame as an input and return a data frame as an output. When looking at code online, you will see many examples of code written in this fashion. The `%>%` symbols at the end of a line are a giveaway. The shortcut CTRL + SHIFT + M is used to print this.
 
 ```{r}
-library(forcats)
 total_votes <- 
 cleaned %>% 
   summarize_at(vars(Conservative:Other),sum, na.rm = TRUE) %>% 
   pivot_longer(everything(),values_to = "Votes", names_to = "Party") %>% 
   mutate(Party = fct_reorder(Party, Votes))
 ```
+
+You can also "pipe" between dplyr and ggplot2 code
 
 ```{r}
 total_votes %>% 
@@ -270,6 +298,10 @@ shef_votes <- cleaned %>%
          Party %in% c("Conservative", "Green", "Labour", "Lib. Dem.")) 
 ```
 
+----
+
+**Exercise**
+
 Produce the following graph to show the vote split for the different parts of Sheffield. These colours were used in the example plot:-
 
 ```{r eval=FALSE}
@@ -278,8 +310,9 @@ c("#0087DC", "#008066","#DC241f","#FDBB30")
 
 
 ![](shef-votes.png)
+----
 
-Now to determine the winners for each constituency. To do this, we will order the percentage of votes within each constituency
+Now to determine the winners for each constituency. To do this, we will order the percentage of votes within each constituency by first grouping within constituency and then using `arrange`.
 
 ```{r}
 cleaned %>% 
@@ -289,7 +322,7 @@ cleaned %>%
   group_by(Constituency) %>% 
   arrange(desc(`Percentage of Vote`),.by_group = TRUE)
 ```
-To calculate the majority (i.e. how much each seat was won by), we'll need the first and second place votes.
+To calculate the majority (i.e. how much each seat was won by), we'll need the first and second place votes. The `lead` function is used to find the second highest number of votes.
 
 ```{r}
 cleaned %>% 
@@ -316,12 +349,28 @@ results <- cleaned %>%
   slice(1)
 ```
 
+Did some parties win by slimmer majorities?
+
+```{r}
+results %>% 
+  filter(Party %in% c("Conservative", "Green", "Labour", "Lib. Dem.","SNP")) %>% 
+  ggplot(aes(x = Party, y = Majority,fill=Party)) + geom_boxplot() + geom_jitter(width=0.1) + scale_fill_manual(values=c("#0087DC", "#008066","#DC241f","#FDBB30","#FFFF00"))
+```
+
 
 We can now work out the number of seats
 
 ```{r}
-results %>% 
-  group_by(Party) %>% 
-  summarize(Seats = n())
+seats_2019 <- results %>% 
+  ungroup() %>% 
+  count(Party) %>% 
+  rename(Seats = n)
+write_csv(seats_2019, "2019_seats.csv")
+```
+
+```{r}
+seats_2019 %>% 
+  filter(Party %in% c("Conservative", "Green", "Labour", "Lib. Dem.","SNP")) %>% 
+ggplot(aes(x = fct_reorder(Party, Seats),y = Seats,fill=Party)) + geom_col() + scale_fill_manual(values=c("#0087DC", "#008066","#DC241f","#FDBB30","#FFFF00")) + xlab("Party") + ylab("Number of Seats")
 ```
 
