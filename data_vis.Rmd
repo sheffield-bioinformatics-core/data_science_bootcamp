@@ -170,7 +170,7 @@ gghistogram(cleaned, "Electorate",y = "..density..") + stat_overlay_normal_densi
 **Exercise**
 
 - Visualise the distribution of electorate sizes in different countries?
-  - as a boxplot with jittered (geom_jitter) points overlaid
+  - as a boxplot (`geom_boxplot`) with jittered (`geom_jitter`) points overlaid
   
 ![](electorate-size-comparison.png)  
 
@@ -309,15 +309,17 @@ cleaned %>%
   filter(!is.na(Votes)) %>% 
   mutate(`Percentage of Vote` = (Votes / `Total votes`)*100)
 ```
-We can now drill-down into the results for particular constituencies. Lets' look at all the Sheffield results for the four biggest parties. 
+We can now drill-down into the results for particular constituencies. Lets' look at all the Sheffield results for the four biggest parties. We have used a convenient `fct_lump_n` to group results into an "Other" category
 
 ```{r}
 shef_votes <- cleaned %>% 
   pivot_longer(Conservative:Other, names_to = "Party", values_to ="Votes") %>% 
   filter(!is.na(Votes)) %>% 
+  mutate(Party = fct_lump_n(Party,4)) %>% 
   mutate(`Percentage of Vote` = (Votes / `Total votes`)*100) %>% 
-  filter(grepl("SHEFFIELD", Constituency), 
-         Party %in% c("Conservative", "Green", "Labour", "Lib. Dem.")) 
+  filter(grepl("SHEFFIELD", Constituency))
+  #       Party %in% c("Conservative", "Green", "Labour", "Lib. Dem.")) 
+
 ```
 
 ----
@@ -327,7 +329,7 @@ shef_votes <- cleaned %>%
 Produce the following graph to show the vote split for the different parts of Sheffield. These colours were used in the example plot:-
 
 ```{r eval=FALSE}
-c("#0087DC", "#008066","#DC241f","#FDBB30")
+c("#0087DC", "#008066","#DC241f","#FDBB30","grey"))
 ```
 
 
