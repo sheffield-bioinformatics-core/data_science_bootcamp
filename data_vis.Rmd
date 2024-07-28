@@ -1,7 +1,29 @@
 ---
 title: "Review of Data Manipulation and Visualization using tidyverse"
+author: Mark Dunning - Sheffield Bioinformatics Core
 output: html_notebook
+date: "Last updated on `r format(Sys.time(), '%d %B, %Y')`"
 ---
+
+![](logo-sm.png)
+
+- [Sheffield Bioinformatics Core](https://sbc.shef.ac.uk)
+- Email: bioinformatics-core@sheffield.ac.uk
+
+# Required packages
+
+```{r eval=FALSE}
+install.packages(c("tidyverse", "ggpubr", "readxl"))
+```
+
+# Datsets 
+
+We will be using historical data on Uk election results. If time allows, we will explore the 2024 results
+
+- [Historical Election Results](1918-2019election_results_by_pcon.xlsx)
+- [2019 Election Results](uk_election_2019.csv)
+- [2024 Election Results](https://researchbriefings.files.parliament.uk/documents/CBP-10009/HoC-GE2024-results-by-constituency.csv)
+
 
 # Outline
 
